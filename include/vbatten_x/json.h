@@ -21,8 +21,8 @@ public:
     explicit JsonValue(const std::string& v) : type_(Type::String), str_(v) {}
     explicit JsonValue(std::string&& v)      : type_(Type::String), str_(std::move(v)) {}
 
-    static JsonValue Array()  { JsonValue j; j.type_ = Type::Array;  return j; }
-    static JsonValue Object() { JsonValue j; j.type_ = Type::Object; return j; }
+    static JsonValue MakeArray()  { JsonValue j; j.type_ = Type::Array;  return j; }
+    static JsonValue MakeObject() { JsonValue j; j.type_ = Type::Object; return j; }
 
     Type GetType() const { return type_; }
     bool IsNull()   const { return type_ == Type::Null; }
@@ -51,7 +51,7 @@ public:
     const JsonValue& operator[](std::size_t i) const { return arr_[i]; }
     std::size_t ArraySize() const { return arr_.size(); }
 
-    const std::unordered_map<std::string, JsonValue>& Object() const { return obj_; }
+    const std::unordered_map<std::string, JsonValue>& AsObject() const { return obj_; }
 
     std::string Dump(int indent = 0) const;
 

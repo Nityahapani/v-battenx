@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel", "pybind11>=3.0"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "vbatten-x"
+version = "0.1.0"
+description = "Physics-informed variational boosting with dynamic topological field mutation"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "scikit-learn>=1.3",
+]
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.7", "networkx>=3.0", "plotly>=5.0"]
+dask = ["dask[distributed]>=2024.1"]
+dev  = ["pytest>=7.0", "coverage>=7.0", "black", "isort"]
+
+[tool.setuptools.packages.find]
+where = ["python-package"]
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"

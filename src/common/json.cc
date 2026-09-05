@@ -30,7 +30,7 @@ static std::string ParseString(const std::string& s, std::size_t& i) {
 }
 
 static JsonValue ParseObject(const std::string& s, std::size_t& i) {
-    auto obj = JsonValue::Object();
+    auto obj = JsonValue::MakeObject();
     ++i;
     SkipWs(s, i);
     if (s[i] == '}') { ++i; return obj; }
@@ -49,7 +49,7 @@ static JsonValue ParseObject(const std::string& s, std::size_t& i) {
 }
 
 static JsonValue ParseArray(const std::string& s, std::size_t& i) {
-    auto arr = JsonValue::Array();
+    auto arr = JsonValue::MakeArray();
     ++i;
     SkipWs(s, i);
     if (s[i] == ']') { ++i; return arr; }

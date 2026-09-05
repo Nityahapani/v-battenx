@@ -1,14 +1,13 @@
-#include "vbatten_x/topology.h"
+#include "src/field/field_impls.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <queue>
-#include <algorithm>
 
 namespace vbx {
 
 class RegionGraph : public FieldTopology {
 public:
-    RegionGraph() { AddRegion(); }
+    RegionGraph() { next_id_ = 0; AddRegion(); }
 
     std::size_t NumRegions() const override { return adj_.size(); }
 
@@ -16,6 +15,7 @@ public:
         auto it = adj_.find(r);
         if (it == adj_.end()) return {};
         std::vector<vbx_region_id> out;
+        out.reserve(it->second.size());
         for (auto& [nb, _] : it->second) out.push_back(nb);
         return out;
     }
@@ -35,8 +35,7 @@ public:
         q.push(adj_.begin()->first);
         while (!q.empty()) {
             auto r = q.front(); q.pop();
-            if (visited.count(r)) continue;
-            visited.insert(r);
+            if (!visited.insert(r).second) continue;
             for (auto nb : Neighbours(r)) q.push(nb);
         }
         return visited.size() == adj_.size();
@@ -53,14 +52,12 @@ public:
         for (auto& [_, nbmap] : adj_) nbmap.erase(r);
     }
 
-    void AddEdge(vbx_region_id a, vbx_region_id b, vbx_float w) override {
-        adj_[a][b] = w;
-        adj_[b][a] = w;
+    void AddEdge(vbx_region_id a, vbx_region_id b, vbx_float w = 1.0f) override {
+        adj_[a][b] = w; adj_[b][a] = w;
     }
 
     void RemoveEdge(vbx_region_id a, vbx_region_id b) override {
-        adj_[a].erase(b);
-        adj_[b].erase(a);
+        adj_[a].erase(b); adj_[b].erase(a);
     }
 
     std::unique_ptr<FieldTopology> Clone() const override {
@@ -73,7 +70,7 @@ public:
 private:
     std::unordered_map<vbx_region_id,
         std::unordered_map<vbx_region_id, vbx_float>> adj_;
-    vbx_region_id next_id_ = 0;
+    vbx_region_id next_id_;
 };
 
 std::unique_ptr<FieldTopology> MakeRegionGraph() {

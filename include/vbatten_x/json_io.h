@@ -9,7 +9,7 @@
 namespace vbx {
 
 inline JsonValue ParameterToJson(const VBXParameter& p) {
-    auto obj = JsonValue::Object();
+    auto obj = JsonValue::MakeObject();
     for (auto& [k, v] : p.All()) {
         std::visit([&](auto&& val) {
             using T = std::decay_t<decltype(val)>;
@@ -24,7 +24,7 @@ inline JsonValue ParameterToJson(const VBXParameter& p) {
 
 inline VBXParameter JsonToParameter(const JsonValue& j) {
     VBXParameter p;
-    for (auto& [k, v] : j.Object()) {
+    for (auto& [k, v] : j.AsObject()) {
         if (v.IsBool())        p.Set(k, v.AsBool());
         else if (v.IsInt())    p.Set(k, v.AsInt());
         else if (v.IsDouble()) p.Set(k, v.AsDouble());

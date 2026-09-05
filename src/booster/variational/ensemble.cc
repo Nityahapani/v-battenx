@@ -13,14 +13,12 @@ struct StageEntry {
 class Ensemble {
 public:
     void Append(FieldState s, vbx_float weight) {
-        stages_.push_back({std::move(s), weight, (int)stages_.size()});
+        stages_.push_back({std::move(s), weight, static_cast<int>(stages_.size())});
     }
 
-    int NumStages() const { return static_cast<int>(stages_.size()); }
-
-    const StageEntry& Stage(int i) const { return stages_.at(i); }
-
-    void Clear() { stages_.clear(); }
+    int               NumStages()     const { return static_cast<int>(stages_.size()); }
+    const StageEntry& Stage(int i)    const { return stages_.at(static_cast<std::size_t>(i)); }
+    void              Clear()               { stages_.clear(); }
 
 private:
     std::vector<StageEntry> stages_;
