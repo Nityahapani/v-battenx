@@ -1,3 +1,4 @@
+#include <iomanip>
 #include "vbatten_x/json.h"
 #include <sstream>
 #include <stdexcept>
@@ -100,7 +101,7 @@ std::string JsonValue::Dump(int indent) const {
         case Type::Null:   os << "null"; break;
         case Type::Bool:   os << (bool_ ? "true" : "false"); break;
         case Type::Int:    os << int_; break;
-        case Type::Double: os << double_; break;
+        case Type::Double: os << std::setprecision(17) << double_; break;
         case Type::String: {
             os << '"';
             for (char c : str_) {
