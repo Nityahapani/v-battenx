@@ -2,6 +2,7 @@
 #include "vbatten_x/data.h"
 #include "vbatten_x/parameter.h"
 #include "vbatten_x/json_io.h"
+#include "vbatten_x/physics_spec.h"
 #include "src/field/field_impls.h"
 #include <cstring>
 #include <string>
@@ -13,6 +14,9 @@ std::shared_ptr<PhysicalDataset> MakeDenseDataset(
     std::vector<vbx_float>, vbx_index, vbx_index,
     FeatureMap, PhysicalMetaInfo, std::vector<vbx_float>);
 std::unique_ptr<VBattenLearner> MakeLearner(VBXParameter);
+
+class VBattenLearnerImpl;
+void SetPhysicsOnLearner(VBattenLearner* learner, const PhysicsSpec& spec);
 }
 
 using namespace vbx;
@@ -49,6 +53,16 @@ int vbx_set_data(void* handle, const float* X, const float* y,
     } catch (std::exception& e) { g_last_error = e.what(); return -1; }
 }
 
+int vbx_set_physics(void* handle, const char* spec_json) {
+    try {
+        auto* h    = static_cast<VBXHandle*>(handle);
+        auto  j    = JsonParse(std::string(spec_json));
+        auto  spec = PhysicsSpec::FromJson(j);
+        SetPhysicsOnLearner(h->learner.get(), spec);
+        return 0;
+    } catch (std::exception& e) { g_last_error = e.what(); return -1; }
+}
+
 int vbx_train(void* handle, int n_iters) {
     try {
         auto* h = static_cast<VBXHandle*>(handle);
@@ -64,8 +78,8 @@ int vbx_predict(void* handle, const float* X, long nrows, long ncols,
         std::vector<vbx_float> data(X, X + nrows * ncols);
         FeatureMap fm;
         for (long c = 0; c < ncols; ++c) fm.Add("f" + std::to_string(c));
-        auto ds = MakeDenseDataset(std::move(data), nrows, ncols,
-                             std::move(fm), {}, {});
+        auto ds   = MakeDenseDataset(std::move(data), nrows, ncols,
+                                     std::move(fm), {}, {});
         auto pred = h->learner->Predict(*ds);
         std::memcpy(out, pred.data(), pred.size() * sizeof(float));
         return 0;

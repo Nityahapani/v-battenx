@@ -1,4 +1,4 @@
-#include "src/physics/pde/finite_diff_ops.cc"
+#include "src/physics/pde/grid_field.h"
 #include <cmath>
 
 namespace vbx {

@@ -1,6 +1,6 @@
 #include "vbatten_x/physics_evaluator.h"
 #include "src/field/field_state.h"
-#include "src/physics/pde/finite_diff_ops.cc"
+#include "src/physics/pde/grid_field.h"
 #include <cmath>
 #include <numeric>
 
