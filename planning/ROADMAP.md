@@ -33,8 +33,8 @@ The component that performs this transformation is the **DTDO**
 
 | Version | Theme | Key Deliverable | Status |
 |---------|-------|-----------------|--------|
-| [v1](./v1/README.md) | Foundation | End-to-end pipeline works; linear booster; sklearn API | 🔲 Not started |
-| [v2](./v2/README.md) | Physics | Real PDE evaluation; physics-informed loss; symmetry encoder | 🔲 Not started |
+| [v1](./v1/README.md) | Foundation | End-to-end pipeline works; linear booster; sklearn API | ✅ Done |
+| [v2](./v2/README.md) | Physics | Real PDE evaluation; physics-informed loss; symmetry encoder | ✅ Done |
 | [v3](./v3/README.md) | DTDO | Rule-based topology/dimension mutation; variational booster | 🔲 Not started |
 | [v4](./v4/README.md) | Scale | Learned DTDO (neural policy); GPU; distributed training | 🔲 Not started |
 | [v5](./v5/README.md) | Release | Stable ABI; full docs; PyPI/CRAN/Maven; v1.0.0 | 🔲 Not started |
