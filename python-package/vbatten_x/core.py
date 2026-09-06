@@ -11,8 +11,6 @@ class Booster:
     def __init__(self, params: Optional[Dict[str, Any]] = None):
         self._params = params or {}
         self._handle = _lib.create(json.dumps(self._params))
-        self._nrows  = 0
-        self._ncols  = 0
 
     def __del__(self):
         if hasattr(self, "_handle") and self._handle is not None:
@@ -20,10 +18,17 @@ class Booster:
             self._handle = None
 
     def set_data(self, X: np.ndarray, y: np.ndarray) -> "Booster":
-        X = np.asarray(X, dtype=np.float32, order="C")
-        y = np.asarray(y, dtype=np.float32)
-        self._nrows, self._ncols = X.shape
-        _lib.set_data(self._handle, X, y)
+        _lib.set_data(self._handle,
+                      np.asarray(X, dtype=np.float32, order="C"),
+                      np.asarray(y, dtype=np.float32))
+        return self
+
+    def set_physics(self, spec) -> "Booster":
+        from .physics import PhysicsSpec
+        if isinstance(spec, PhysicsSpec):
+            _lib.set_physics(self._handle, spec.to_json())
+        else:
+            _lib.set_physics(self._handle, json.dumps(spec))
         return self
 
     def train(self, n_iters: int = 100) -> "Booster":
@@ -31,8 +36,8 @@ class Booster:
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        X = np.asarray(X, dtype=np.float32, order="C")
-        return _lib.predict(self._handle, X)
+        return _lib.predict(self._handle,
+                            np.asarray(X, dtype=np.float32, order="C"))
 
     def save(self, path: str) -> None:
         _lib.save(self._handle, path)

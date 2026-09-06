@@ -108,3 +108,13 @@ def num_stages(h) -> int:
 
 def destroy(h):
     _lib.vbx_destroy(h)
+
+
+_lib.vbx_set_physics.restype  = ctypes.c_int
+_lib.vbx_set_physics.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+
+
+def set_physics(h, spec_json: str):
+    ret = _lib.vbx_set_physics(h, spec_json.encode())
+    if ret != 0:
+        raise RuntimeError(_lib.vbx_last_error().decode())
