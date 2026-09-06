@@ -1,6 +1,6 @@
 # V-BATTEN-X · v1 — Foundation & Core Abstractions
 
-> **Status: ✅ COMPLETE — released as v0.1.0**
+> **Status: ✅ COMPLETE — released as v1**
 > Released: see GitHub release `v0.1.0`
 > All exit criteria met. 20/20 tests passing.
 
