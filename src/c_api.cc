@@ -14,9 +14,7 @@ std::shared_ptr<PhysicalDataset> MakeDenseDataset(
     std::vector<vbx_float>, vbx_index, vbx_index,
     FeatureMap, PhysicalMetaInfo, std::vector<vbx_float>);
 std::unique_ptr<VBattenLearner> MakeLearner(VBXParameter);
-
-class VBattenLearnerImpl;
-void SetPhysicsOnLearner(VBattenLearner* learner, const PhysicsSpec& spec);
+void SetPhysicsOnLearner(VBattenLearner*, const PhysicsSpec&);
 }
 
 using namespace vbx;
@@ -55,9 +53,9 @@ int vbx_set_data(void* handle, const float* X, const float* y,
 
 int vbx_set_physics(void* handle, const char* spec_json) {
     try {
-        auto* h    = static_cast<VBXHandle*>(handle);
-        auto  j    = JsonParse(std::string(spec_json));
-        auto  spec = PhysicsSpec::FromJson(j);
+        auto* h  = static_cast<VBXHandle*>(handle);
+        auto  j  = JsonParse(std::string(spec_json));
+        auto spec = PhysicsSpec::FromJson(j);
         SetPhysicsOnLearner(h->learner.get(), spec);
         return 0;
     } catch (std::exception& e) { g_last_error = e.what(); return -1; }
@@ -96,9 +94,9 @@ int vbx_load(void* handle, const char* path) {
     catch (std::exception& e) { g_last_error = e.what(); return -1; }
 }
 
-float       vbx_train_loss(void* h) { return static_cast<VBXHandle*>(h)->learner->TrainLoss(); }
-int         vbx_num_stages(void* h) { return static_cast<VBXHandle*>(h)->learner->NumStages(); }
-void        vbx_destroy(void* h)    { delete static_cast<VBXHandle*>(h); }
-const char* vbx_last_error()        { return g_last_error.c_str(); }
+float       vbx_train_loss(void* h)    { return static_cast<VBXHandle*>(h)->learner->TrainLoss(); }
+int         vbx_num_stages(void* h)    { return static_cast<VBXHandle*>(h)->learner->NumStages(); }
+void        vbx_destroy(void* h)       { delete static_cast<VBXHandle*>(h); }
+const char* vbx_last_error()           { return g_last_error.c_str(); }
 
 } // extern "C"

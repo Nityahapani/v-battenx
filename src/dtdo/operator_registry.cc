@@ -1,23 +1,22 @@
 #include "vbatten_x/topological_operator.h"
 #include "src/dtdo/mutation_router.cc"
 #include <string>
-#include <unordered_map>
 #include <stdexcept>
 
 namespace vbx {
 
 std::unique_ptr<TopologicalOperator> MakeOperator(const std::string& name,
-                                                    float tau_expand   = 0.1f,
-                                                    float tau_collapse = 0.01f) {
+                                                    float tau_expand,
+                                                    float tau_collapse) {
     if (name == "threshold")
         return MakeThresholdOperator(tau_expand, tau_collapse);
     if (name == "gradient")
-        return MakeGradientOperator();
+        return MakeGradientOperator(0.05f, 0.005f);
     if (name == "pruner")
-        return MakeComplexityPruner();
+        return MakeComplexityPruner(5);
     if (name == "router" || name == "default")
-        return MakeMutationRouter(tau_expand, tau_collapse);
-    if (name == "none" || name == "")
+        return MakeMutationRouter(tau_expand, tau_collapse, 0.05f, 0.005f, 5);
+    if (name == "none" || name.empty())
         return nullptr;
     throw std::runtime_error("Unknown TopologicalOperator: " + name);
 }

@@ -1,6 +1,7 @@
+#include "src/field/topology/topology_ops.h"
 #include "vbatten_x/topological_operator.h"
 #include "src/field/field_state.h"
-#include "src/field/topology/topology_ops.cc"
+
 
 namespace vbx {
 

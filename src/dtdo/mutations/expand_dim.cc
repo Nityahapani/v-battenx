@@ -1,7 +1,8 @@
+#include "src/field/dimension/dim_transitions.h"
 #include "vbatten_x/topological_operator.h"
 #include "src/field/field_state.h"
 #include "src/field/field_impls.h"
-#include "src/field/dimension/dim_transitions.cc"
+
 #include <random>
 
 namespace vbx {
