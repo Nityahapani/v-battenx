@@ -118,3 +118,6 @@ def set_physics(h, spec_json: str):
     ret = _lib.vbx_set_physics(h, spec_json.encode())
     if ret != 0:
         raise RuntimeError(_lib.vbx_last_error().decode())
+
+
+_lib.vbx_num_mutations = None  # not yet in ABI — accessed via model JSON

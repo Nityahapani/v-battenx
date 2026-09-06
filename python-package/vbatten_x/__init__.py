@@ -1,11 +1,12 @@
-from .core     import Booster
+from .core     import Booster, MutationEvent
 from .training import train, train_with_physics, cv
 from .sklearn  import VBattenXRegressor, VBattenXClassifier
 from .physics  import PhysicsSpec, PDEType, SymmetryGroup, BCType
 
-__version__ = "2.0.0"
+__version__ = "3.0.0"
 __all__ = [
     "Booster",
+    "MutationEvent",
     "train",
     "train_with_physics",
     "cv",

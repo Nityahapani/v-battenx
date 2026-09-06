@@ -19,7 +19,12 @@ class _VBattenXBase(BaseEstimator):
         lambda_pde:    float = 0.0,
         tol:           float = 1e-6,
         verbose:       int   = 0,
-        physics_spec: Optional[PhysicsSpec] = None,
+        physics_spec:  Optional[PhysicsSpec] = None,
+        dtdo:          str   = "none",
+        tau_expand:    float = 0.1,
+        tau_collapse:  float = 0.01,
+        max_total_dim: int   = 64,
+        max_regions:   int   = 16,
     ):
         self.n_estimators  = n_estimators
         self.learning_rate = learning_rate
@@ -28,6 +33,11 @@ class _VBattenXBase(BaseEstimator):
         self.tol           = tol
         self.verbose       = verbose
         self.physics_spec  = physics_spec
+        self.dtdo          = dtdo
+        self.tau_expand    = tau_expand
+        self.tau_collapse  = tau_collapse
+        self.max_total_dim = max_total_dim
+        self.max_regions   = max_regions
 
     def _make_params(self, objective: str) -> Dict[str, Any]:
         return {
@@ -37,18 +47,19 @@ class _VBattenXBase(BaseEstimator):
             "lambda_pde":    self.lambda_pde,
             "tol":           self.tol,
             "verbose":       self.verbose,
+            "dtdo":          self.dtdo,
+            "tau_expand":    self.tau_expand,
+            "tau_collapse":  self.tau_collapse,
+            "max_total_dim": self.max_total_dim,
+            "max_regions":   self.max_regions,
         }
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
-        return {
-            "n_estimators":  self.n_estimators,
-            "learning_rate": self.learning_rate,
-            "reg_lambda":    self.reg_lambda,
-            "lambda_pde":    self.lambda_pde,
-            "tol":           self.tol,
-            "verbose":       self.verbose,
-            "physics_spec":  self.physics_spec,
-        }
+        return {k: getattr(self, k) for k in [
+            "n_estimators", "learning_rate", "reg_lambda", "lambda_pde",
+            "tol", "verbose", "physics_spec", "dtdo",
+            "tau_expand", "tau_collapse", "max_total_dim", "max_regions",
+        ]}
 
     def set_params(self, **params) -> "_VBattenXBase":
         for k, v in params.items():
@@ -59,6 +70,11 @@ class _VBattenXBase(BaseEstimator):
     def feature_importances_(self) -> np.ndarray:
         check_is_fitted(self, "booster_")
         return np.zeros(self.n_features_in_, dtype=np.float64)
+
+    @property
+    def mutation_log_(self):
+        check_is_fitted(self, "booster_")
+        return self.booster_.get_mutation_log()
 
 
 class VBattenXRegressor(_VBattenXBase, RegressorMixin):
