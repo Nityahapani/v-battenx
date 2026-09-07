@@ -2,8 +2,9 @@ from .core     import Booster, MutationEvent
 from .training import train, train_with_physics, cv
 from .sklearn  import VBattenXRegressor, VBattenXClassifier
 from .physics  import PhysicsSpec, PDEType, SymmetryGroup, BCType
+from .dask     import DaskBooster
 
-__version__ = "3.0.0"
+__version__ = "4.0.0"
 __all__ = [
     "Booster",
     "MutationEvent",
@@ -16,4 +17,5 @@ __all__ = [
     "PDEType",
     "SymmetryGroup",
     "BCType",
+    "DaskBooster",
 ]

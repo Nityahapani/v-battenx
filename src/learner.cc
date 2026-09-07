@@ -149,7 +149,7 @@ public:
 
     void Save(const std::string& path) const override {
         auto root = JsonValue::MakeObject();
-        root.Set("version",          JsonValue(std::string("3.0.0")));
+        root.Set("version",          JsonValue(std::string("4.0.0")));
         root.Set("num_stages",       JsonValue(ensemble_.NumStages()));
         root.Set("learning_rate",    JsonValue(static_cast<double>(lr_)));
         root.Set("reg_lambda",       JsonValue(static_cast<double>(lambda_)));

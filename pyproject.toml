@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "vbatten-x"
-version = "3.0.0"
+version = "4.0.0"
 description = "Physics-informed variational boosting with dynamic topological field mutation"
 readme = "README.md"
 license = {text = "Apache-2.0"}
