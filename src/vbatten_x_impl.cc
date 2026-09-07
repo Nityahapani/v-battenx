@@ -37,3 +37,5 @@
 #include "src/dtdo/mutations/add_edge.cc"
 #include "src/dtdo/mutations/remove_edge.cc"
 #include "src/dtdo/mutations/local_dim_change.cc"
+#include "src/collective/local_communicator.cc"
+#include "src/data/partitioner.cc"
