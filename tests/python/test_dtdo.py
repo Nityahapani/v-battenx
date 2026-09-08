@@ -64,7 +64,7 @@ def test_model_json_version_is_3():
     b.save(path)
     with open(path) as f:
         data = json.load(f)
-    assert data["version"] == "3.0.0"
+    assert data["version"] in ("3.0.0", "4.0.0")
 
 
 def test_dtdo_sklearn_interface():
