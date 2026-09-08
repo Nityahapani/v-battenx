@@ -121,3 +121,32 @@ def set_physics(h, spec_json: str):
 
 
 _lib.vbx_num_mutations = None  # not yet in ABI — accessed via model JSON
+
+
+_lib.vbx_get_metric.restype  = ctypes.c_double
+_lib.vbx_get_metric.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+
+_lib.vbx_get_mutation_log.restype  = ctypes.c_char_p
+_lib.vbx_get_mutation_log.argtypes = [ctypes.c_void_p, ctypes.c_int]
+
+_lib.vbx_abi_version.restype  = ctypes.c_int
+_lib.vbx_abi_version.argtypes = []
+
+_lib.vbx_version_string.restype  = ctypes.c_char_p
+_lib.vbx_version_string.argtypes = []
+
+
+def get_metric(h, name: str) -> float:
+    return float(_lib.vbx_get_metric(h, name.encode()))
+
+
+def get_mutation_log_json(h, stage: int) -> str:
+    return _lib.vbx_get_mutation_log(h, stage).decode()
+
+
+def abi_version() -> int:
+    return int(_lib.vbx_abi_version())
+
+
+def lib_version() -> str:
+    return _lib.vbx_version_string().decode()

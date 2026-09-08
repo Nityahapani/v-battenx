@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
+import json
+from typing import Optional, Callable, List
 
 
 class EarlyStopping:
@@ -14,11 +15,9 @@ class EarlyStopping:
         self._best_iter = 0
 
     def __call__(self, iteration: int, result) -> bool:
-        val = result.value if hasattr(result, "value") else result
+        val = result.value if hasattr(result, "value") else float(result)
         if self._best - val > self.min_delta:
-            self._best      = val
-            self._wait      = 0
-            self._best_iter = iteration
+            self._best = val; self._wait = 0; self._best_iter = iteration
         else:
             self._wait += 1
         return self._wait >= self.rounds
@@ -44,13 +43,15 @@ class PhysicsResidualMonitor:
     def __init__(self, tol: float = 1e-3, stop_on_converge: bool = False):
         self.tol              = tol
         self.stop_on_converge = stop_on_converge
-        self.history: list    = []
+        self.history: List[float] = []
 
     def __call__(self, iteration: int, residual: float) -> bool:
         self.history.append(residual)
-        if self.stop_on_converge and residual < self.tol:
-            return True
-        return False
+        return self.stop_on_converge and residual < self.tol
+
+    @property
+    def converged(self) -> bool:
+        return bool(self.history) and self.history[-1] < self.tol
 
 
 class TopologyLogger:
@@ -59,7 +60,27 @@ class TopologyLogger:
         os.makedirs(log_dir, exist_ok=True)
 
     def __call__(self, iteration: int, mutation_log: dict) -> None:
-        import json
         path = os.path.join(self.log_dir, f"topology_{iteration:05d}.json")
         with open(path, "w") as f:
             json.dump(mutation_log, f)
+
+
+class LearningRateScheduler:
+    def __init__(self, schedule_fn: Callable[[int], float]):
+        self._fn = schedule_fn
+
+    def __call__(self, iteration: int) -> float:
+        return self._fn(iteration)
+
+    @staticmethod
+    def cosine(initial_lr: float, total_steps: int) -> "LearningRateScheduler":
+        import math
+        return LearningRateScheduler(
+            lambda t: initial_lr * 0.5 * (1 + math.cos(math.pi * t / total_steps))
+        )
+
+    @staticmethod
+    def step(initial_lr: float, decay: float, step_every: int) -> "LearningRateScheduler":
+        return LearningRateScheduler(
+            lambda t: initial_lr * (decay ** (t // step_every))
+        )
