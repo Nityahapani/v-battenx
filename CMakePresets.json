@@ -1,0 +1,52 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug (CPU)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "USE_CUDA": "OFF",
+        "USE_MPI": "OFF",
+        "USE_OPENMP": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (CPU)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "USE_CUDA": "OFF",
+        "USE_MPI": "OFF",
+        "USE_OPENMP": "ON"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "AddressSanitizer",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/asan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "USE_CUDA": "OFF"
+      }
+    },
+    {
+      "name": "cuda",
+      "displayName": "Release (CUDA)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/cuda",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "USE_CUDA": "ON",
+        "USE_MPI": "OFF",
+        "USE_OPENMP": "ON"
+      }
+    }
+  ]
+}

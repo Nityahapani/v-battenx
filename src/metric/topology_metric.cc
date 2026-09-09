@@ -1,5 +1,5 @@
 #include "vbatten_x/metric.h"
-#include "src/field/topology/simplex_complex.cc"
+#include "src/field/topology/simplex_complex.h"
 
 namespace vbx {
 

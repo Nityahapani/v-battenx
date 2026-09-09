@@ -1,3 +1,29 @@
-.github/workflows/
+# Build artifacts
+build/
+*.so
+*.a
+*.o
 *.pyc
 __pycache__/
+*.egg-info/
+dist/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Benchmark outputs (committed manually)
+benchmark/results/*.csv
+
+# OS
+.DS_Store
+Thumbs.db
+!python-package/vbatten_x/_vbatten_x.so
