@@ -20,9 +20,10 @@ public:
     GradPair GetGradients(Span<const vbx_float> pred,
                           Span<const vbx_float> label) const override {
         auto gp = task_->GetGradients(pred, label);
-        if (last_pde_residual_ > 0.0f) {
-            float pde_grad_scale = lambda_pde_ * last_pde_residual_;
-            for (auto& v : gp.g) v += pde_grad_scale;
+        if (last_pde_residual_ > 0.0f && !gp.g.empty()) {
+            float pde_grad = 2.0f * lambda_pde_ * last_pde_residual_
+                             / static_cast<float>(gp.g.size());
+            for (auto& v : gp.g) v += pde_grad;
         }
         return gp;
     }

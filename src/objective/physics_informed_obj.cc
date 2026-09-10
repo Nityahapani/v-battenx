@@ -16,8 +16,12 @@ public:
     GradPair GetGradients(Span<const vbx_float> pred,
                           Span<const vbx_float> label) const override {
         auto gp = task_->GetGradients(pred, label);
-        float phys_grad = 2.0f * lambda_ * last_pde_residual_;
-        for (auto& v : gp.g) v += phys_grad;
+        // ∂(λr²)/∂ŷ_i ≈ 2λr / N  (uniform approximation to ∂r/∂ŷ_i)
+        if (last_pde_residual_ != 0.0f && !gp.g.empty()) {
+            float phys_grad = 2.0f * lambda_ * last_pde_residual_
+                              / static_cast<float>(gp.g.size());
+            for (auto& v : gp.g) v += phys_grad;
+        }
         return gp;
     }
 
