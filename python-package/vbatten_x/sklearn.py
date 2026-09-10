@@ -25,6 +25,7 @@ class _VBattenXBase(BaseEstimator):
         tau_collapse:  float = 0.01,
         max_total_dim: int   = 64,
         max_regions:   int   = 16,
+        ras_alpha:     float = 0.0,
     ):
         self.n_estimators  = n_estimators
         self.learning_rate = learning_rate
@@ -38,6 +39,7 @@ class _VBattenXBase(BaseEstimator):
         self.tau_collapse  = tau_collapse
         self.max_total_dim = max_total_dim
         self.max_regions   = max_regions
+        self.ras_alpha     = ras_alpha
 
     def _make_params(self, objective: str) -> Dict[str, Any]:
         return {
@@ -52,6 +54,7 @@ class _VBattenXBase(BaseEstimator):
             "tau_collapse":  self.tau_collapse,
             "max_total_dim": self.max_total_dim,
             "max_regions":   self.max_regions,
+            "ras_alpha":     self.ras_alpha,
         }
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
@@ -59,6 +62,7 @@ class _VBattenXBase(BaseEstimator):
             "n_estimators", "learning_rate", "reg_lambda", "lambda_pde",
             "tol", "verbose", "physics_spec", "dtdo",
             "tau_expand", "tau_collapse", "max_total_dim", "max_regions",
+            "ras_alpha",
         ]}
 
     def set_params(self, **params) -> "_VBattenXBase":
