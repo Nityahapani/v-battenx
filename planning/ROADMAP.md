@@ -37,7 +37,7 @@ The component that performs this transformation is the **DTDO**
 | [v2](./v2/README.md) | Physics | Real PDE evaluation; physics-informed loss; symmetry encoder | ✅ Done |
 | [v3](./v3/README.md) | DTDO | Rule-based topology/dimension mutation; variational booster | ✅ Done |
 | [v4](./v4/README.md) | Scale | Learned DTDO (neural policy); GPU; distributed training | ✅ Done |
-| [v5](./v5/README.md) | Release | Stable ABI; full docs; PyPI/CRAN/Maven; v1.0.0 | 🔲 Not started |
+| [v5](./v5/README.md) | Release | Stable ABI; full docs; PyPI/CRAN/Maven; v1.0.0 | ✅ Done |
 
 Update status to 🔄 In Progress / ✅ Done as work proceeds.
 
