@@ -26,6 +26,8 @@ class _VBattenXBase(BaseEstimator):
         max_total_dim: int   = 64,
         max_regions:   int   = 16,
         ras_alpha:     float = 0.0,
+        huber_delta:   float = 1.0,
+        objective:     str   = "regression",
     ):
         self.n_estimators  = n_estimators
         self.learning_rate = learning_rate
@@ -40,10 +42,13 @@ class _VBattenXBase(BaseEstimator):
         self.max_total_dim = max_total_dim
         self.max_regions   = max_regions
         self.ras_alpha     = ras_alpha
+        self.huber_delta   = huber_delta
+        self.objective     = objective
 
     def _make_params(self, objective: str) -> Dict[str, Any]:
+        obj = self.objective if self.objective != "regression" else objective
         return {
-            "objective":     objective,
+            "objective":     obj,
             "learning_rate": self.learning_rate,
             "reg_lambda":    self.reg_lambda,
             "lambda_pde":    self.lambda_pde,
@@ -55,6 +60,7 @@ class _VBattenXBase(BaseEstimator):
             "max_total_dim": self.max_total_dim,
             "max_regions":   self.max_regions,
             "ras_alpha":     self.ras_alpha,
+            "huber_delta":   self.huber_delta,
         }
 
     def get_params(self, deep: bool = True) -> Dict[str, Any]:
@@ -62,7 +68,7 @@ class _VBattenXBase(BaseEstimator):
             "n_estimators", "learning_rate", "reg_lambda", "lambda_pde",
             "tol", "verbose", "physics_spec", "dtdo",
             "tau_expand", "tau_collapse", "max_total_dim", "max_regions",
-            "ras_alpha",
+            "ras_alpha", "huber_delta", "objective",
         ]}
 
     def set_params(self, **params) -> "_VBattenXBase":
