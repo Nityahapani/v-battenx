@@ -12,6 +12,7 @@
 #include "src/physics/pde/conservation_ops.cc"
 #include "src/physics/evaluator_registry.cc"
 #include "src/objective/regression_obj.cc"
+#include "src/objective/huber_obj.cc"
 #include "src/objective/classification_obj.cc"
 #include "src/objective/pde_constrained_obj.cc"
 #include "src/objective/physics_informed_obj.cc"

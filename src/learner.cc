@@ -23,6 +23,7 @@ namespace vbx {
 
 std::unique_ptr<Objective>          MakeRegressionObjective();
 std::unique_ptr<Objective>          MakeClassificationObjective();
+std::unique_ptr<Objective>          MakeHuberObjective(vbx_float delta);
 std::unique_ptr<PhysicsMetric>      MakeRmseMetric();
 std::unique_ptr<PhysicsMetric>      MakeAucMetric();
 std::unique_ptr<PhysicsEvaluator>   MakeNullEvaluator();
@@ -42,12 +43,15 @@ public:
         lambda_pde_        = static_cast<vbx_float>(params_.GetOr<double>("lambda_pde",    0.0));
         tau_expand_        = static_cast<vbx_float>(params_.GetOr<double>("tau_expand",    0.1));
         tau_collapse_      = static_cast<vbx_float>(params_.GetOr<double>("tau_collapse",  0.01));
+        ras_alpha_         = static_cast<vbx_float>(params_.GetOr<double>("ras_alpha",     0.0));
+        huber_delta_       = static_cast<vbx_float>(params_.GetOr<double>("huber_delta",   1.0));
         max_total_dim_     = params_.GetOr<int>("max_total_dim",  64);
         max_regions_       = params_.GetOr<int>("max_regions",    16);
         max_connections_   = params_.GetOr<int>("max_connections", 32);
         verbose_           = params_.GetOr<int>("verbose",          1);
 
         if (obj == "classification") { obj_ = MakeClassificationObjective(); metric_ = MakeAucMetric(); }
+        else if (obj == "huber")     { obj_ = MakeHuberObjective(huber_delta_); metric_ = MakeRmseMetric(); }
         else                         { obj_ = MakeRegressionObjective();     metric_ = MakeRmseMetric(); }
 
         evaluator_ = MakeNullEvaluator();
@@ -67,6 +71,7 @@ public:
         train_loss_        = 0.0f;
         last_pde_residual_ = 0.0f;
         total_mutations_   = 0;
+        ras_               = ResidualAdaptiveShrinkage(lr_, ras_alpha_);
 
         FieldState current_state;
         current_state.F = MakeContinuousField(static_cast<std::size_t>(ds.NumCols()), 1);
@@ -101,14 +106,20 @@ public:
                 for (auto& v : gp.g) v += pde_grad;
             }
 
+            // Residual-Adaptive Shrinkage: dampen step when physics residual
+            // is high (trust-region shrinkage), recover full step when r≈0.
+            // α=0 recovers the original constant-lr behaviour.
+            ras_.UpdateResidual(last_pde_residual_);
+            vbx_float effective_lr = (ras_alpha_ > 0.0f) ? ras_.Compute() : lr_;
+
             FieldState stage = booster_->DoBoost(ds, gp);
             auto sp = predictor_->Predict(ds, stage);
             for (std::size_t r = 0; r < nrows; ++r)
-                pred_[r] += lr_ * sp[r];
+                pred_[r] += effective_lr * sp[r];
 
             float pde_after = evaluator_->Eval(current_state, ds).MeanPde();
             ensemble_.Append(std::move(stage), std::move(mutation_log),
-                             lr_, pde_before, pde_after);
+                             effective_lr, pde_before, pde_after);
 
             train_loss_ = obj_->Loss({pred_.data(), nrows}, {ds.Labels(), nrows});
             if (lambda_pde_ > 0.0f)
@@ -234,6 +245,9 @@ private:
     vbx_float                             lambda_;
     vbx_float                             tol_;
     vbx_float                             lambda_pde_;
+    vbx_float                             ras_alpha_;
+    vbx_float                             huber_delta_;
+    ResidualAdaptiveShrinkage             ras_{0.1f, 0.0f};
     float                                 tau_expand_;
     float                                 tau_collapse_;
     int                                   max_total_dim_;
