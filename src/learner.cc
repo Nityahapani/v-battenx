@@ -23,6 +23,7 @@ namespace vbx {
 
 std::unique_ptr<Objective>          MakeRegressionObjective();
 std::unique_ptr<Objective>          MakeClassificationObjective();
+std::unique_ptr<Objective>          MakeHuberObjective(vbx_float delta);
 std::unique_ptr<PhysicsMetric>      MakeRmseMetric();
 std::unique_ptr<PhysicsMetric>      MakeAucMetric();
 std::unique_ptr<PhysicsEvaluator>   MakeNullEvaluator();
@@ -42,12 +43,15 @@ public:
         lambda_pde_        = static_cast<vbx_float>(params_.GetOr<double>("lambda_pde",    0.0));
         tau_expand_        = static_cast<vbx_float>(params_.GetOr<double>("tau_expand",    0.1));
         tau_collapse_      = static_cast<vbx_float>(params_.GetOr<double>("tau_collapse",  0.01));
+        ras_alpha_         = static_cast<vbx_float>(params_.GetOr<double>("ras_alpha",     0.0));
+        huber_delta_       = static_cast<vbx_float>(params_.GetOr<double>("huber_delta",   1.0));
         max_total_dim_     = params_.GetOr<int>("max_total_dim",  64);
         max_regions_       = params_.GetOr<int>("max_regions",    16);
         max_connections_   = params_.GetOr<int>("max_connections", 32);
         verbose_           = params_.GetOr<int>("verbose",          1);
 
         if (obj == "classification") { obj_ = MakeClassificationObjective(); metric_ = MakeAucMetric(); }
+        else if (obj == "huber")     { obj_ = MakeHuberObjective(huber_delta_); metric_ = MakeRmseMetric(); }
         else                         { obj_ = MakeRegressionObjective();     metric_ = MakeRmseMetric(); }
 
         evaluator_ = MakeNullEvaluator();
@@ -234,6 +238,9 @@ private:
     vbx_float                             lambda_;
     vbx_float                             tol_;
     vbx_float                             lambda_pde_;
+    vbx_float                             ras_alpha_;
+    vbx_float                             huber_delta_;
+    ResidualAdaptiveShrinkage             ras_{0.1f, 0.0f};
     float                                 tau_expand_;
     float                                 tau_collapse_;
     int                                   max_total_dim_;
