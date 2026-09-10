@@ -69,47 +69,38 @@ std::vector<float> Expand2dTo3d(const std::vector<float>& params, uint64_t seed)
 }
 
 std::vector<float> Collapse3dTo2d(const std::vector<float>& params) {
-    float norm = 0.0f;
-    for (float v : params) norm += v * v;
-    norm = std::sqrt(norm);
-
     std::size_t triples = params.size() / 3;
     Eigen::MatrixXf data(triples, 3);
     for (std::size_t i = 0; i < triples; ++i)
         for (int j = 0; j < 3; ++j)
             data(i, j) = params[3 * i + j];
 
-    auto basis  = PcaBasis(data, 2);
+    auto basis           = PcaBasis(data, 2);
     Eigen::MatrixXf proj = data * basis;
 
+    // PCA projection already minimises reconstruction error (Eckart–Young).
+    // Do not rescale: proj's Frobenius norm equals sqrt(sum of top-2
+    // eigenvalues), which is the energy that the 2-d subspace can represent.
     std::vector<float> out(triples * 2);
     for (std::size_t i = 0; i < triples; ++i)
         for (int j = 0; j < 2; ++j)
             out[2 * i + j] = proj(i, j);
-
-    NormaliseFrobenius(out, norm);
     return out;
 }
 
 std::vector<float> Collapse2dTo1d(const std::vector<float>& params) {
-    float norm = 0.0f;
-    for (float v : params) norm += v * v;
-    norm = std::sqrt(norm);
-
     std::size_t pairs = params.size() / 2;
     Eigen::MatrixXf data(pairs, 2);
     for (std::size_t i = 0; i < pairs; ++i)
         for (int j = 0; j < 2; ++j)
             data(i, j) = params[2 * i + j];
 
-    auto basis  = PcaBasis(data, 1);
+    auto basis           = PcaBasis(data, 1);
     Eigen::MatrixXf proj = data * basis;
 
     std::vector<float> out(pairs);
     for (std::size_t i = 0; i < pairs; ++i)
         out[i] = proj(i, 0);
-
-    NormaliseFrobenius(out, norm);
     return out;
 }
 
@@ -134,22 +125,18 @@ std::vector<float> LocalDimChange(const std::vector<float>& params,
     } else {
         if (from_d == 3 && to_d == 2) return Collapse3dTo2d(params);
         if (from_d == 2 && to_d == 1) return Collapse2dTo1d(params);
-        float norm = 0.0f;
-        for (float v : params) norm += v * v;
-        norm = std::sqrt(norm);
-        std::size_t n = params.size();
+        std::size_t n      = params.size();
         std::size_t groups = n / from_d;
         Eigen::MatrixXf data(groups, from_d);
         for (std::size_t g = 0; g < groups; ++g)
             for (int d = 0; d < from_d; ++d)
                 data(g, d) = params[g * from_d + d];
-        auto basis = PcaBasis(data, to_d);
+        auto basis           = PcaBasis(data, to_d);
         Eigen::MatrixXf proj = data * basis;
         std::vector<float> out(groups * to_d);
         for (std::size_t g = 0; g < groups; ++g)
             for (int d = 0; d < to_d; ++d)
                 out[g * to_d + d] = proj(g, d);
-        NormaliseFrobenius(out, norm);
         return out;
     }
 }
