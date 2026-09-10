@@ -74,6 +74,8 @@ public:
         current_state.d = MakeUniformDim(1, 1, static_cast<float>(max_total_dim_));
         current_state.T = MakeRank2Tensor(0, 1, 1);
 
+        ShrinkageSchedule shrinkage(lr_);
+
         float prev_loss = 1e30f;
         for (int iter = 0; iter < num_iters; ++iter) {
             ResidualInfo residuals = evaluator_->Eval(current_state, ds);
@@ -101,14 +103,20 @@ public:
                 for (auto& v : gp.g) v += pde_grad;
             }
 
+            float grad_norm = 0.0f;
+            for (auto v : gp.g) grad_norm += v * v;
+            grad_norm = std::sqrt(grad_norm / static_cast<float>(nrows));
+            shrinkage.Update(grad_norm);
+            vbx_float step_lr = shrinkage(iter);
+
             FieldState stage = booster_->DoBoost(ds, gp);
             auto sp = predictor_->Predict(ds, stage);
             for (std::size_t r = 0; r < nrows; ++r)
-                pred_[r] += lr_ * sp[r];
+                pred_[r] += step_lr * sp[r];
 
             float pde_after = evaluator_->Eval(current_state, ds).MeanPde();
             ensemble_.Append(std::move(stage), std::move(mutation_log),
-                             lr_, pde_before, pde_after);
+                             step_lr, pde_before, pde_after);
 
             train_loss_ = obj_->Loss({pred_.data(), nrows}, {ds.Labels(), nrows});
             if (lambda_pde_ > 0.0f)

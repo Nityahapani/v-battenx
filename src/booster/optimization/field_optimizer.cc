@@ -56,15 +56,12 @@ public:
     explicit LbfgsOptimizer(int memory = 10, float lr = 1.0f)
         : m_(memory), lr_(lr) {}
 
-    void Step(Eigen::VectorXf& params,
-              const Eigen::VectorXf& grad,
-              std::function<float(const Eigen::VectorXf&)> loss_fn) {
-        if (s_list_.size() >= static_cast<std::size_t>(m_)) {
-            s_list_.erase(s_list_.begin());
-            y_list_.erase(y_list_.begin());
-            rho_list_.erase(rho_list_.begin());
-        }
-
+    // grad must be ∇f at the current params.
+    // On return, params is updated to θ_{k+1} and the curvature pair
+    // (s_k = θ_{k+1} - θ_k,  y_k = ∇f(θ_{k+1}) - ∇f(θ_k)) is stored
+    // on the *next* call once the caller re-evaluates the gradient.
+    void Step(Eigen::VectorXf& params, const Eigen::VectorXf& grad) {
+        // Build two-loop recursion with curvature pairs accumulated so far.
         Eigen::VectorXf q = grad;
         int k = static_cast<int>(s_list_.size());
         std::vector<float> alpha(k);
@@ -76,6 +73,7 @@ public:
 
         Eigen::VectorXf r = q;
         if (k > 0) {
+            // Nocedal & Wright (2006) eq. 7.20: γ = sᵀy / yᵀy
             float gamma = s_list_.back().dot(y_list_.back())
                         / (y_list_.back().squaredNorm() + 1e-9f);
             r *= gamma;
@@ -86,54 +84,86 @@ public:
             r += s_list_[i] * (alpha[i] - beta);
         }
 
-        Eigen::VectorXf direction = -r;
-        Eigen::VectorXf prev      = params;
-        Eigen::VectorXf prev_grad = grad;
+        // Store θ_k and ∇f(θ_k) before moving.
+        Eigen::VectorXf prev_params = params;
+        prev_grad_                  = grad;
 
-        params += lr_ * direction;
+        params += lr_ * (-r);
 
-        Eigen::VectorXf s   = params - prev;
-        Eigen::VectorXf y   = grad - prev_grad;
-        float sy = s.dot(y);
+        // s_k is available now; y_k = ∇f(θ_{k+1}) - ∇f(θ_k) will be
+        // computed on the next call once the caller supplies the new gradient.
+        pending_s_ = params - prev_params;
+        has_pending_ = true;
+    }
+
+    // Call this at the start of each Step() with the freshly-evaluated grad
+    // to commit the previous curvature pair.
+    void CommitPair(const Eigen::VectorXf& new_grad) {
+        if (!has_pending_) return;
+        Eigen::VectorXf y  = new_grad - prev_grad_;
+        float           sy = pending_s_.dot(y);
         if (sy > 1e-10f) {
-            s_list_.push_back(s);
+            if (s_list_.size() >= static_cast<std::size_t>(m_)) {
+                s_list_.erase(s_list_.begin());
+                y_list_.erase(y_list_.begin());
+                rho_list_.erase(rho_list_.begin());
+            }
+            s_list_.push_back(pending_s_);
             y_list_.push_back(y);
             rho_list_.push_back(1.0f / sy);
         }
+        has_pending_ = false;
     }
 
-    void Reset() { s_list_.clear(); y_list_.clear(); rho_list_.clear(); }
+    void Reset() {
+        s_list_.clear(); y_list_.clear(); rho_list_.clear();
+        has_pending_ = false;
+    }
+
+    void SetLr(float lr) { lr_ = lr; }
 
 private:
-    int                      m_;
-    float                    lr_;
+    int                          m_;
+    float                        lr_;
+    bool                         has_pending_ = false;
+    Eigen::VectorXf              pending_s_;
+    Eigen::VectorXf              prev_grad_;
     std::vector<Eigen::VectorXf> s_list_, y_list_;
     std::vector<float>           rho_list_;
 };
 
 class ConstrainedOptimizer {
 public:
-    ConstrainedOptimizer(float inner_lr = 1e-3f,
-                          float rho     = 1.0f,
-                          int   inner_steps = 10)
-        : adam_(inner_lr), rho_(rho), inner_steps_(inner_steps) {}
+    ConstrainedOptimizer(float inner_lr = 1e-3f, float rho = 1.0f)
+        : adam_(inner_lr), rho_(rho) {}
 
+    // Augmented Lagrangian primal step for inequality constraints g_c(θ) ≤ 0.
+    //
+    // The augmented Lagrangian is:
+    //   L_aug = f(θ) + Σ_c [ λ_c·g_c + (ρ/2)·max(0, g_c)² ]
+    //
+    // Without explicit constraint Jacobians ∇g_c, we scale the task gradient
+    // by the total penalty factor:
+    //   ∇_θ L_aug ≈ (1 + Σ_c μ_c) · ∇_θ f
+    // where μ_c = max(0, λ_c + ρ·g_c) is the active penalty weight.
+    //
+    // Dual update (projected for inequality: λ ≥ 0):
+    //   λ_c ← max(0, λ_c + ρ·g_c)
     void Step(Eigen::VectorXf& params,
               const Eigen::VectorXf& task_grad,
               const std::vector<float>& constraint_violations) {
+        if (lambdas_.size() < constraint_violations.size())
+            lambdas_.resize(constraint_violations.size(), 0.0f);
+
+        float penalty_scale = 1.0f;
         for (std::size_t c = 0; c < constraint_violations.size(); ++c) {
-            if (lambdas_.size() <= c) lambdas_.push_back(0.0f);
-            lambdas_[c] += rho_ * constraint_violations[c];
+            float g_c = constraint_violations[c];
+            float mu  = std::max(0.0f, lambdas_[c] + rho_ * g_c);
+            penalty_scale += mu;
+            lambdas_[c] = mu;   // dual update with projection λ ≥ 0
         }
 
-        Eigen::VectorXf aug_grad = task_grad;
-        for (std::size_t c = 0; c < constraint_violations.size() && c < lambdas_.size(); ++c) {
-            float penalty_grad = lambdas_[c] + rho_ * constraint_violations[c];
-            aug_grad.array()  += penalty_grad * 0.01f;
-        }
-
-        for (int step = 0; step < inner_steps_; ++step)
-            adam_.Step(params, aug_grad);
+        adam_.Step(params, task_grad * penalty_scale);
     }
 
     void Reset() { lambdas_.clear(); adam_.Reset(); }
@@ -141,7 +171,6 @@ public:
 private:
     AdamOptimizer      adam_;
     float              rho_;
-    int                inner_steps_;
     std::vector<float> lambdas_;
 };
 
