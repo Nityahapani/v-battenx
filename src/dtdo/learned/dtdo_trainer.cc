@@ -8,6 +8,8 @@ namespace vbx {
 
 struct Experience {
     std::vector<float> region_features;
+    std::vector<float> pre_activation;   // GELU input (W1·f + b1), needed for backprop
+    std::vector<float> hidden;           // GELU output h, needed for ∂W2
     int                action_idx;
     float              reward;
     float              log_prob;
@@ -42,6 +44,22 @@ private:
     std::size_t            max_size_;
 };
 
+// GELU derivative: GELU'(x) = 0.5*(1 + tanh(c*(x+0.044715*x³)))
+//                             + 0.5*x * sech²(c*(x+0.044715*x³)) * c*(1+3*0.044715*x²)
+// where c = 0.7978845608.
+static Eigen::VectorXf GeluGrad(const Eigen::VectorXf& pre) {
+    const float c = 0.7978845608f;
+    Eigen::VectorXf out(pre.size());
+    for (int i = 0; i < pre.size(); ++i) {
+        float x  = pre[i];
+        float u  = c * (x + 0.044715f * x * x * x);
+        float t  = std::tanh(u);
+        float du = c * (1.0f + 3.0f * 0.044715f * x * x);
+        out[i]   = 0.5f * (1.0f + t) + 0.5f * x * (1.0f - t * t) * du;
+    }
+    return out;
+}
+
 class DtdoTrainer {
 public:
     DtdoTrainer(DtdoNet*  net,
@@ -52,11 +70,15 @@ public:
         : net_(net), lr_(lr), gamma_(gamma),
           update_freq_(update_freq), buffer_(buf_size), rng_(42) {}
 
+    // Record a transition. Caller must supply pre_activation (W1·f+b1) and
+    // hidden (GELU output) from the forward pass so Update() can backprop.
     void RecordTransition(const std::vector<float>& feat,
+                           const std::vector<float>& pre_activation,
+                           const std::vector<float>& hidden,
                            int    action_idx,
                            float  reward,
                            float  log_prob) {
-        buffer_.Push({feat, action_idx, reward, log_prob});
+        buffer_.Push({feat, pre_activation, hidden, action_idx, reward, log_prob});
         ++step_count_;
     }
 
@@ -65,36 +87,97 @@ public:
             Update();
     }
 
+    // REINFORCE update with baseline (mean reward).
+    //
+    // For each experience (f, pre, h, a, r):
+    //   Â = (r - mean_r) / std_r                       [normalised advantage]
+    //
+    // Two-layer head:  pre = W1·f + b1,  h = GELU(pre),  logit = W2·h + b2
+    //
+    // Policy-gradient loss:  L = -E[log π(a|s) · Â]
+    //
+    // Key identity: d(log π(a))/d(logits) = e_a - π
+    // Therefore:   dL/d(logits) = -Â·(e_a - π) = Â·(π - e_a)
+    //
+    // Gradient (per sample, averaged over batch):
+    //   δ_logit = Â·(π - e_a) / B
+    //   ∂L/∂W2 += δ_logit · hᵀ
+    //   ∂L/∂b2 += δ_logit
+    //   δ_h    = W2ᵀ · δ_logit
+    //   δ_pre  = δ_h ⊙ GELU'(pre)
+    //   ∂L/∂W1 += δ_pre · fᵀ
+    //   ∂L/∂b1 += δ_pre
     void Update() {
-        auto batch    = buffer_.Sample(32, rng_);
-        float pg_loss = 0.0f;
+        auto batch = buffer_.Sample(32, rng_);
+        float bs   = static_cast<float>(batch.size());
 
         float mean_r = 0.0f;
         for (auto& e : batch) mean_r += e.reward;
-        mean_r /= batch.size();
+        mean_r /= bs;
 
         float std_r = 0.0f;
         for (auto& e : batch) std_r += (e.reward - mean_r) * (e.reward - mean_r);
-        std_r = std::sqrt(std_r / batch.size() + 1e-8f);
+        std_r = std::sqrt(std_r / bs + 1e-8f);
 
-        for (auto& e : batch) {
-            float adv = (e.reward - mean_r) / std_r;
-            pg_loss  -= e.log_prob * adv;
-        }
-        pg_loss /= batch.size();
-
-        // gradient step on head + logit layers
         auto& head   = net_->HeadLayer();
         auto& logits = net_->LogitLayer();
 
-        float grad_scale = -lr_ * pg_loss;
-        head.W   *= (1.0f - grad_scale * 1e-4f);
-        logits.W *= (1.0f - grad_scale * 1e-4f);
+        int hd   = static_cast<int>(head.W.rows());
+        int fd   = static_cast<int>(head.W.cols());
+        int od   = static_cast<int>(logits.W.rows());
+
+        Eigen::MatrixXf dW1 = Eigen::MatrixXf::Zero(hd, fd);
+        Eigen::VectorXf db1 = Eigen::VectorXf::Zero(hd);
+        Eigen::MatrixXf dW2 = Eigen::MatrixXf::Zero(od, hd);
+        Eigen::VectorXf db2 = Eigen::VectorXf::Zero(od);
+
+        float pg_loss = 0.0f;
+
+        for (auto& e : batch) {
+            float adv = (e.reward - mean_r) / std_r;
+
+            Eigen::Map<const Eigen::VectorXf> f(
+                e.region_features.data(), static_cast<int>(e.region_features.size()));
+            Eigen::Map<const Eigen::VectorXf> pre(
+                e.pre_activation.data(), static_cast<int>(e.pre_activation.size()));
+            Eigen::Map<const Eigen::VectorXf> h(
+                e.hidden.data(), static_cast<int>(e.hidden.size()));
+
+            // Re-compute logits and softmax (W2 may have changed since recording).
+            Eigen::VectorXf logit_vec = logits.Forward(h);
+            int n_act = static_cast<int>(logit_vec.size());
+            Eigen::VectorXf pi = (logit_vec.array() - logit_vec.maxCoeff()).exp();
+            pi /= pi.sum();
+
+            pg_loss -= (e.action_idx < n_act ? std::log(pi[e.action_idx] + 1e-9f) : 0.0f) * adv;
+
+            // dL/dlogits = Â · (π − e_a) / B
+            // d(log π(a))/dlogits = e_a − π  ⟹  dL/dlogits = −Â·(e_a−π) = Â·(π−e_a)
+            Eigen::VectorXf delta_logit = pi;
+            if (e.action_idx < n_act) delta_logit[e.action_idx] -= 1.0f;
+            delta_logit *= adv / bs;
+
+            dW2 += delta_logit * h.transpose();
+            db2 += delta_logit;
+
+            Eigen::VectorXf delta_h   = logits.W.transpose() * delta_logit;
+            Eigen::VectorXf delta_pre = delta_h.cwiseProduct(GeluGrad(pre));
+
+            if (delta_pre.size() == hd && f.size() == fd) {
+                dW1 += delta_pre * f.transpose();
+                db1 += delta_pre;
+            }
+        }
+
+        head.W   -= lr_ * dW1;
+        head.b   -= lr_ * db1;
+        logits.W -= lr_ * dW2;
+        logits.b -= lr_ * db2;
 
         total_updates_++;
         if (total_updates_ % 50 == 0)
             std::cout << "[DTDO-trainer] update=" << total_updates_
-                      << " pg_loss=" << pg_loss << "\n";
+                      << " pg_loss=" << pg_loss / bs << "\n";
     }
 
     void ImmitationStep(const std::vector<float>& feat,
@@ -104,7 +187,8 @@ public:
         auto& head   = net_->HeadLayer();
         auto& logits = net_->LogitLayer();
 
-        Eigen::VectorXf h   = Gelu(head.Forward(f));
+        Eigen::VectorXf pre = head.Forward(f);
+        Eigen::VectorXf h   = Gelu(pre);
         Eigen::VectorXf out = logits.Forward(h);
 
         if (rule_based_action >= out.size()) return;
@@ -112,16 +196,18 @@ public:
         Eigen::VectorXf probs = (out.array() - out.maxCoeff()).exp();
         probs /= probs.sum();
 
-        float log_p = std::log(probs[rule_based_action] + 1e-9f);
-        float ce    = -log_p;
+        // Cross-entropy gradient w.r.t. logits: π - e_a
+        Eigen::VectorXf delta_logit = probs;
+        delta_logit[rule_based_action] -= 1.0f;
+        delta_logit *= lr_;
 
-        // supervised step: pull logit for correct action up
-        Eigen::VectorXf grad_out = probs;
-        grad_out[rule_based_action] -= 1.0f;
-        grad_out *= lr_;
+        logits.W -= delta_logit * h.transpose();
+        logits.b -= delta_logit;
 
-        logits.W -= grad_out * h.transpose();
-        logits.b -= grad_out;
+        Eigen::VectorXf delta_h   = logits.W.transpose() * delta_logit;
+        Eigen::VectorXf delta_pre = delta_h.cwiseProduct(GeluGrad(pre));
+        head.W -= delta_pre * f.transpose();
+        head.b -= delta_pre;
     }
 
     int TotalUpdates() const { return total_updates_; }
