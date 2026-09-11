@@ -13,34 +13,48 @@ public:
 
     ResidualInfo Eval(const FieldState& state,
                       const PhysicalDataset& ds) const override {
-        auto params = state.F->Params();
-        int  n      = nx_ * ny_;
+        int         n      = nx_ * ny_;
+        int         nrows  = static_cast<int>(ds.NumRows());
+        int         ncols  = static_cast<int>(ds.NumCols());
+        const float* raw   = ds.RawData();
 
-        GridField u_curr;
-        u_curr.nx = nx_;
-        u_curr.ny = ny_;
-        u_curr.h  = h_;
-        u_curr.u.resize(n);
+        if (!raw || nrows == 0 || ncols < n)
+            return {{0.0f}, {0.0f}, {0.0f}};
+
+        auto params = state.F->Params();
+
+        GridField u_curr, u_prev;
+        u_curr.nx = u_prev.nx = nx_;
+        u_curr.ny = u_prev.ny = ny_;
+        u_curr.h  = u_prev.h  = h_;
+        u_curr.u.resize(n, 0.0f);
+        u_prev.u.resize(n, 0.0f);
+
+        // u_curr: field state produced by the model (shared across rows).
         for (int k = 0; k < n && k < static_cast<int>(params.size()); ++k)
             u_curr.u[k] = params[k];
 
-        GridField u_prev = u_curr;
-        auto raw = ds.RawData();
-        if (raw && ds.NumRows() >= 1 && ds.NumCols() >= n) {
+        double total = 0.0;
+        int    count = 0;
+
+        // Each dataset row is one flattened field snapshot u(x,t).
+        // Residual: |(u_curr - u_row)/dt - α·∇²u_curr|² per grid cell per row.
+        for (int r = 0; r < nrows; ++r) {
             for (int k = 0; k < n; ++k)
-                u_prev.u[k] = raw[k];
+                u_prev.u[k] = raw[r * ncols + k];
+
+            for (int j = 0; j < ny_; ++j) {
+                for (int i = 0; i < nx_; ++i) {
+                    float dudt  = (u_curr.at(i,j) - u_prev.at(i,j)) / dt_;
+                    float lap   = laplacian(u_curr, i, j);
+                    float resid = dudt - alpha_ * lap;
+                    total += static_cast<double>(resid * resid);
+                    ++count;
+                }
+            }
         }
 
-        double total = 0.0;
-        for (int j = 0; j < ny_; ++j)
-            for (int i = 0; i < nx_; ++i) {
-                float dudt  = (u_curr.at(i,j) - u_prev.at(i,j)) / dt_;
-                float lap   = laplacian(u_curr, i, j);
-                float resid = dudt - alpha_ * lap;
-                total += resid * resid;
-            }
-
-        float rms = static_cast<float>(std::sqrt(total / n));
+        float rms = static_cast<float>(std::sqrt(total / std::max(count, 1)));
         return {{rms}, {0.0f}, {0.0f}};
     }
 
