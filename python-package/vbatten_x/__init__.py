@@ -1,4 +1,5 @@
-from .core     import Booster, MutationEvent, PhysicalDataset
+from .core       import Booster, MutationEvent, PhysicalDataset
+from .objectives import HuberBooster, MseBooster, DiagPrecondBooster, CholBooster
 from .training import train, train_with_physics, cv, early_stopping
 from .sklearn  import VBattenXRegressor, VBattenXClassifier
 from .physics  import PhysicsSpec, PDEType, SymmetryGroup, BCType
@@ -10,6 +11,7 @@ from .callback import (EarlyStopping, ModelCheckpoint,
 __version__ = "5.0.0"
 __all__ = [
     "Booster", "MutationEvent", "PhysicalDataset",
+    "HuberBooster", "MseBooster", "DiagPrecondBooster", "CholBooster",
     "train", "train_with_physics", "cv", "early_stopping",
     "VBattenXRegressor", "VBattenXClassifier",
     "PhysicsSpec", "PDEType", "SymmetryGroup", "BCType",
