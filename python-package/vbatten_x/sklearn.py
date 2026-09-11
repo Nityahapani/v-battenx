@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import numpy as np
 from typing import Optional, Dict, Any
 
@@ -63,33 +64,53 @@ class _VBattenXBase(BaseEstimator):
             "huber_delta":   self.huber_delta,
         }
 
-    def get_params(self, deep: bool = True) -> Dict[str, Any]:
-        return {k: getattr(self, k) for k in [
-            "n_estimators", "learning_rate", "reg_lambda", "lambda_pde",
-            "tol", "verbose", "physics_spec", "dtdo",
-            "tau_expand", "tau_collapse", "max_total_dim", "max_regions",
-            "ras_alpha", "huber_delta", "objective",
-        ]}
-
-    def set_params(self, **params) -> "_VBattenXBase":
-        for k, v in params.items():
-            setattr(self, k, v)
-        return self
+    def _feature_importances_from_model(self) -> np.ndarray:
+        n = self.n_features_in_
+        if self.booster_._last_model_json is None:
+            return np.zeros(n, dtype=np.float64)
+        data   = json.loads(self.booster_._last_model_json)
+        scores = np.zeros(n, dtype=np.float64)
+        for stage in data.get("stages", []):
+            weights = stage.get("feature_weights", [])
+            for i, w in enumerate(weights):
+                if i < n:
+                    scores[i] += abs(float(w))
+        total = scores.sum()
+        return scores / total if total > 0 else scores
 
     @property
     def feature_importances_(self) -> np.ndarray:
         check_is_fitted(self, "booster_")
-        return np.zeros(self.n_features_in_, dtype=np.float64)
+        return self._feature_importances_from_model()
 
     @property
     def mutation_log_(self):
         check_is_fitted(self, "booster_")
         return self.booster_.get_mutation_log()
 
+    def get_params(self, deep: bool = True) -> Dict[str, Any]:
+        return {
+            k: getattr(self, k) for k in [
+                "n_estimators", "learning_rate", "reg_lambda", "lambda_pde",
+                "tol", "verbose", "physics_spec", "dtdo",
+                "tau_expand", "tau_collapse", "max_total_dim", "max_regions",
+                "ras_alpha", "huber_delta", "objective",
+            ]
+        }
+
+    def set_params(self, **params) -> "_VBattenXBase":
+        for k, v in params.items():
+            setattr(self, k, v)
+        return self
+
 
 class VBattenXRegressor(_VBattenXBase, RegressorMixin):
-    def fit(self, X: np.ndarray, y: np.ndarray,
-            sample_weight=None) -> "VBattenXRegressor":
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        sample_weight=None,
+    ) -> "VBattenXRegressor":
         X = np.asarray(X, dtype=np.float32)
         y = np.asarray(y, dtype=np.float32)
         self.n_features_in_ = X.shape[1]
@@ -102,17 +123,20 @@ class VBattenXRegressor(_VBattenXBase, RegressorMixin):
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         check_is_fitted(self, "booster_")
-        return self.booster_.predict(
-            np.asarray(X, dtype=np.float32)).astype(np.float64)
+        return self.booster_.predict(np.asarray(X, dtype=np.float32)).astype(np.float64)
 
     def score(self, X: np.ndarray, y: np.ndarray, sample_weight=None) -> float:
         from sklearn.metrics import r2_score
-        return float(r2_score(y, self.predict(X)))
+        return float(r2_score(y, self.predict(X), sample_weight=sample_weight))
 
 
 class VBattenXClassifier(_VBattenXBase, ClassifierMixin):
-    def fit(self, X: np.ndarray, y: np.ndarray,
-            sample_weight=None) -> "VBattenXClassifier":
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        sample_weight=None,
+    ) -> "VBattenXClassifier":
         X = np.asarray(X, dtype=np.float32)
         y = np.asarray(y, dtype=np.float32)
         self.classes_       = np.unique(y)
@@ -126,8 +150,8 @@ class VBattenXClassifier(_VBattenXBase, ClassifierMixin):
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         check_is_fitted(self, "booster_")
-        raw = self.booster_.predict(np.asarray(X, dtype=np.float32))
-        p   = 1.0 / (1.0 + np.exp(-raw.astype(np.float64)))
+        raw = self.booster_.predict(np.asarray(X, dtype=np.float32)).astype(np.float64)
+        p   = 1.0 / (1.0 + np.exp(-raw))
         return np.column_stack([1.0 - p, p])
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -135,4 +159,4 @@ class VBattenXClassifier(_VBattenXBase, ClassifierMixin):
 
     def score(self, X: np.ndarray, y: np.ndarray, sample_weight=None) -> float:
         from sklearn.metrics import accuracy_score
-        return float(accuracy_score(y, self.predict(X)))
+        return float(accuracy_score(y, self.predict(X), sample_weight=sample_weight))

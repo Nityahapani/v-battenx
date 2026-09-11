@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 import json
-from typing import Optional, Callable, List
+import math
+from typing import Callable, List, Optional
 
 
 class EarlyStopping:
@@ -17,7 +18,9 @@ class EarlyStopping:
     def __call__(self, iteration: int, result) -> bool:
         val = result.value if hasattr(result, "value") else float(result)
         if self._best - val > self.min_delta:
-            self._best = val; self._wait = 0; self._best_iter = iteration
+            self._best = val
+            self._wait = 0
+            self._best_iter = iteration
         else:
             self._wait += 1
         return self._wait >= self.rounds
@@ -46,7 +49,7 @@ class PhysicsResidualMonitor:
         self.history: List[float] = []
 
     def __call__(self, iteration: int, residual: float) -> bool:
-        self.history.append(residual)
+        self.history.append(float(residual))
         return self.stop_on_converge and residual < self.tol
 
     @property
@@ -74,9 +77,8 @@ class LearningRateScheduler:
 
     @staticmethod
     def cosine(initial_lr: float, total_steps: int) -> "LearningRateScheduler":
-        import math
         return LearningRateScheduler(
-            lambda t: initial_lr * 0.5 * (1 + math.cos(math.pi * t / total_steps))
+            lambda t: initial_lr * 0.5 * (1.0 + math.cos(math.pi * t / total_steps))
         )
 
     @staticmethod
@@ -84,3 +86,20 @@ class LearningRateScheduler:
         return LearningRateScheduler(
             lambda t: initial_lr * (decay ** (t // step_every))
         )
+
+    @staticmethod
+    def exponential(initial_lr: float, decay_rate: float) -> "LearningRateScheduler":
+        return LearningRateScheduler(
+            lambda t: initial_lr * (decay_rate ** t)
+        )
+
+    @staticmethod
+    def warmup_cosine(
+        warmup_steps: int, initial_lr: float, total_steps: int
+    ) -> "LearningRateScheduler":
+        def schedule(t: int) -> float:
+            if t < warmup_steps:
+                return initial_lr * t / max(1, warmup_steps)
+            progress = (t - warmup_steps) / max(1, total_steps - warmup_steps)
+            return initial_lr * 0.5 * (1.0 + math.cos(math.pi * progress))
+        return LearningRateScheduler(schedule)
